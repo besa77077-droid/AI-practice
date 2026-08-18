@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "insight-engine"
+version = "0.1.0"
+description = "AI-агент синтеза пользовательских интервью — MVP-1"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "scikit-learn>=1.4",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+audio = [
+    "faster-whisper>=1.0",
+]
+diarization = [
+    "pyannote.audio>=3.1",
+]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+insight-engine-serve = "insight_engine.webapp:serve"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

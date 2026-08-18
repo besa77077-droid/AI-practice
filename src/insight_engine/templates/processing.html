@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Обработка — Insight Engine{% endblock %}
+{% block content %}
+<div class="processing-view">
+  <h1>Обработка интервью</h1>
+  <p class="processing-view__hint">Ручной разбор такого интервью занял бы 2-3 часа. AI справляется за минуты — время зависит от длины записи и от того, как быстро отвечает LLM.</p>
+
+  <ol class="pipeline-steps" id="pipeline-steps">
+    <li class="pipeline-step" data-step="transcribe"><span class="pipeline-step__dot"></span><span class="pipeline-step__label">Транскрибация / разбор транскрипта</span><span class="pipeline-step__detail"></span></li>
+    <li class="pipeline-step" data-step="extract"><span class="pipeline-step__dot"></span><span class="pipeline-step__label">Структурный разбор LLM по схеме</span><span class="pipeline-step__detail"></span></li>
+    <li class="pipeline-step" data-step="match"><span class="pipeline-step__dot"></span><span class="pipeline-step__label">Сопоставление цитат с транскриптом</span><span class="pipeline-step__detail"></span></li>
+    <li class="pipeline-step" data-step="cluster"><span class="pipeline-step__dot"></span><span class="pipeline-step__label">Дедупликация и кластеризация с корпусом</span><span class="pipeline-step__detail"></span></li>
+    <li class="pipeline-step" data-step="hypotheses"><span class="pipeline-step__dot"></span><span class="pipeline-step__label">Формирование гипотез</span><span class="pipeline-step__detail"></span></li>
+  </ol>
+
+  <div id="processing-error" class="flash flash--error" hidden></div>
+  <a id="processing-cancel" class="btn btn--ghost" href="/interviews">Загрузить другое</a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.__jobId = "{{ job_id }}";</script>
+{% endblock %}
