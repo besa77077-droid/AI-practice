@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Insight Engine{% endblock %}</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topnav">
+    <div class="topnav__brand">Insight Engine</div>
+    <nav class="topnav__tabs">
+      <a href="/interviews" class="{{ 'is-active' if request.url.path.startswith('/interviews') or request.url.path.startswith('/processing') else '' }}">Интервью</a>
+      <a href="/hypotheses" class="{{ 'is-active' if request.url.path.startswith('/hypotheses') else '' }}">Гипотезы и бэклог</a>
+    </nav>
+    <button id="theme-toggle" class="btn btn--ghost" type="button" aria-label="Переключить тему">
+      <span class="theme-icon">◐</span>
+    </button>
+  </header>
+  <main class="app-main">
+    {% if message %}
+    <div class="flash">{{ message }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% block scripts %}{% endblock %}
+<script src="/static/app.js"></script>
+</body>
+</html>

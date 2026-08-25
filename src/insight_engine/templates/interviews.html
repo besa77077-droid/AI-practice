@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Интервью — Insight Engine{% endblock %}
+{% block content %}
+<div class="interviews-layout">
+  <aside class="interview-list">
+    <button class="btn btn--primary btn--block" type="button" data-open-modal="upload-modal">+ Загрузить интервью</button>
+    <ul class="interview-list__items">
+      {% for iv in interviews %}
+      <li>
+        <a href="/interviews/{{ iv.id }}" class="interview-list__item {{ 'is-active' if active_interview and active_interview.id == iv.id else '' }}">
+          <span class="interview-list__title">{{ iv.title }}</span>
+          <span class="interview-list__meta">{{ iv.respondent }} · {{ iv.segment_label }}</span>
+        </a>
+      </li>
+      {% else %}
+      <li class="interview-list__empty">Пока нет обработанных интервью</li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <section class="interview-content">
+    {% if active_interview %}
+      <div class="interview-header">
+        <div>
+          <h1>{{ active_interview.title }}</h1>
+          <p class="interview-header__meta">{{ active_interview.respondent }} · {{ active_interview.segment_label }}
+            · {{ active_interview.segments|length }} реплик</p>
+        </div>
+        <div class="interview-header__stat"><span class="tabular">{{ total_interviews }}</span> интервью в базе</div>
+      </div>
+
+      <div class="split-view">
+        <div class="split-view__cards">
+          <h2 class="section-heading">Извлечённые инсайты <span class="tabular">({{ insights|length }})</span></h2>
+          {% for insight in insights %}
+          <article class="insight-card insight-card--{{ insight.signal_strength.value }} {{ 'is-rejected' if insight.status == 'rejected' else '' }}" data-insight-id="{{ insight.id }}">
+            <button class="insight-card__toggle" type="button" data-toggle-card>
+              <span class="signal-badge signal-badge--{{ insight.signal_strength.value }}">{{ insight.signal_strength.label_ru }}</span>
+              <span class="insight-card__pain">{{ insight.pain }}</span>
+              <span class="insight-card__chevron">›</span>
+            </button>
+            <div class="insight-card__body">
+              <dl class="insight-card__fields">
+                <dt>Контекст возникновения</dt>
+                <dd>{{ insight.context }}</dd>
+                <dt>Текущий workaround</dt>
+                <dd>{{ insight.workaround }}</dd>
+                <dt>Job To Be Done</dt>
+                <dd>{{ insight.jtbd }}</dd>
+              </dl>
+              {% if insight.segment_id is not none %}
+              <button class="insight-card__quote" type="button" data-jump-to-segment="{{ insight.segment_id }}">
+                «{{ insight.quote }}»
+                {% if insight.quote_start is not none %}<span class="tabular quote-timecode">{{ '%02d:%02d'|format((insight.quote_start // 60)|int, (insight.quote_start % 60)|int) }}</span>{% endif %}
+              </button>
+              {% else %}
+              <p class="insight-card__quote insight-card__quote--unlinked">«{{ insight.quote }}»</p>
+              {% endif %}
+              {% if insight.id in frequency_by_insight %}
+              <p class="frequency-chip">Названо {{ frequency_by_insight[insight.id] }} из {{ total_interviews }} респондентов
+                <span class="frequency-bar"><span style="width: {{ (100 * frequency_by_insight[insight.id] / total_interviews)|round|int }}%"></span></span>
+              </p>
+              {% endif %}
+              <form method="post" action="/insights/{{ insight.id }}/status" class="insight-card__actions">
+                <button type="submit" name="status" value="accepted" class="btn btn--tiny">Принять</button>
+                <button type="submit" name="status" value="rejected" class="btn btn--tiny btn--ghost">Отклонить</button>
+              </form>
+            </div>
+          </article>
+          {% else %}
+          <p class="empty-state">По этому интервью не извлечено ни одного инсайта.</p>
+          {% endfor %}
+        </div>
+
+        <div class="split-view__transcript">
+          <h2 class="section-heading">Транскрипт</h2>
+          <div class="transcript-panel" id="transcript-panel">
+            {% for seg in active_interview.segments %}
+            <div class="transcript-line {{ 'transcript-line--marked' if seg.id in (insights|map(attribute='segment_id')|list) else '' }} {{ 'transcript-line--interviewer' if 'интервьюер' in seg.speaker.lower() or 'interview' in seg.speaker.lower() else '' }}" id="seg-{{ seg.id }}">
+              <div class="transcript-line__meta">
+                <span class="transcript-line__speaker">{{ seg.speaker }}</span>
+                {% if seg.start is not none %}<span class="tabular transcript-line__time">{{ '%02d:%02d'|format((seg.start // 60)|int, (seg.start % 60)|int) }}</span>{% endif %}
+              </div>
+              <p>{{ seg.text }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="empty-hero">
+        <h1>Загрузите запись или транскрипт discovery-звонка</h1>
+        <p>AI распознает речь, разметит спикеров, разберёт интервью по фиксированной схеме и сопоставит с накопленной базой.</p>
+        <button class="btn btn--primary" type="button" data-open-modal="upload-modal">Загрузить интервью</button>
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+<div class="modal" id="upload-modal" hidden>
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__panel">
+    <h2>Загрузить интервью</h2>
+    <form method="post" action="/upload" enctype="multipart/form-data" class="upload-form">
+      <label>Название интервью
+        <input type="text" name="title" required placeholder="Интервью 08: Фарида Р., малый бизнес">
+      </label>
+      <label>Респондент
+        <input type="text" name="respondent" required placeholder="Фарида Р.">
+      </label>
+      <label>Сегмент клиента
+        <select name="segment_label" required>
+          <option value="Розничный клиент">Розничный клиент</option>
+          <option value="Малый бизнес">Малый бизнес</option>
+        </select>
+      </label>
+
+      <fieldset class="source-fieldset">
+        <legend>Источник</legend>
+        <label class="source-option">
+          <input type="radio" name="source" value="audio_file" checked> Аудиозапись (MP3, WAV, MP4)
+          <input type="file" name="audio_file" accept="audio/*,.mp3,.wav,.mp4,.m4a">
+        </label>
+        <label class="source-option">
+          <input type="radio" name="source" value="transcript_file"> Файл транскрипта (TXT)
+          <input type="file" name="transcript_file" accept=".txt">
+        </label>
+        <label class="source-option">
+          <input type="radio" name="source" value="transcript_text"> Вставить текст транскрипта
+          <textarea name="transcript_text" rows="4" placeholder="[00:12] Фарида Р.: ..."></textarea>
+        </label>
+      </fieldset>
+
+      <details class="advanced-options">
+        <summary>Дополнительные настройки распознавания</summary>
+        <label>Размер модели Whisper
+          <select name="whisper_model">
+            <option value="tiny">tiny (самый быстрый)</option>
+            <option value="small" selected>small</option>
+            <option value="medium">medium (точнее, дольше)</option>
+          </select>
+        </label>
+        <label class="checkbox-row"><input type="checkbox" name="diarize"> Диаризация по спикерам (нужен HuggingFace-токен)</label>
+        <label>HuggingFace-токен
+          <input type="text" name="hf_token" placeholder="hf_...">
+        </label>
+      </details>
+
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Отмена</button>
+        <button type="submit" class="btn btn--primary">Начать обработку</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+window.__highlightSegment = {% if highlight_segment is defined and highlight_segment is not none %}{{ highlight_segment }}{% else %}null{% endif %};
+</script>
+{% endblock %}

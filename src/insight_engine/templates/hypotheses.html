@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Гипотезы — Insight Engine{% endblock %}
+{% block content %}
+<div class="hypotheses-view">
+  <div class="hypotheses-header">
+    <h1>Гипотезы и бэклог</h1>
+    <button class="btn btn--primary" type="button" data-open-modal="export-modal" {{ 'disabled' if not hypotheses }}>Выгрузить в бэклог</button>
+  </div>
+
+  {% if not hypotheses %}
+  <p class="empty-state">Гипотезы появятся после обработки первого интервью.</p>
+  {% endif %}
+
+  <ul class="hypothesis-list">
+    {% for h in hypotheses %}
+    <li class="hypothesis-card hypothesis-card--{{ h.priority.value }}">
+      <div class="hypothesis-card__header">
+        <label class="checkbox-row">
+          <input type="checkbox" name="hypothesis_ids" value="{{ h.id }}" form="export-form">
+        </label>
+        <span class="signal-badge signal-badge--{{ h.priority.value }}">Приоритет: {{ h.priority.label_ru }}</span>
+        <span class="status-chip status-chip--{{ h.status }}">
+          {{ {"draft": "Черновик", "confirmed": "Подтверждена продактом", "in_backlog": "В бэклоге"}[h.status] }}
+        </span>
+      </div>
+      <p class="hypothesis-card__text">{{ h.text }}</p>
+      <p class="hypothesis-card__metric">Метрика: <strong>{{ h.metric }}</strong> — {{ h.metric_direction }}</p>
+
+      <details class="hypothesis-card__basis">
+        <summary>Основание ({{ basis_by_hyp[h.id]|length }} цитаты)</summary>
+        <ul class="basis-list">
+          {% for member in basis_by_hyp[h.id] %}
+          <li class="basis-item">
+            <a href="/interviews/{{ member.interview_id }}?highlight={{ member.segment_id }}" class="basis-item__quote">
+              «{{ member.quote }}»
+            </a>
+            <span class="basis-item__source">— {{ member.respondent }}, «{{ member.interview_title }}»</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </details>
+
+      {% if h.status == "draft" %}
+      <form method="post" action="/hypotheses/{{ h.id }}/confirm" class="hypothesis-card__actions">
+        <button type="submit" class="btn btn--tiny">Подтвердить продактом</button>
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+
+<div class="modal" id="export-modal" hidden>
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__panel">
+    <h2>Выгрузить в бэклог</h2>
+    <form method="post" action="/hypotheses/export" id="export-form">
+      <label>Система
+        <select name="tracker">
+          <option value="jira">Jira</option>
+          <option value="youtrack">YouTrack</option>
+          <option value="notion">Notion</option>
+        </select>
+      </label>
+      <p class="modal__hint">Будут выгружены только отмеченные гипотезы.</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" data-close-modal>Отмена</button>
+        <button type="submit" class="btn btn--primary">Подтвердить</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
