@@ -40,10 +40,12 @@ def get_store() -> InsightStore:
 
 
 def get_llm():
+    timeout_env = os.environ.get("OLLAMA_TIMEOUT_S")
     return build_llm_provider(
         os.environ.get("INSIGHT_ENGINE_LLM", "ollama"),
         model=os.environ.get("OLLAMA_MODEL", "llama3.1"),
         base_url=os.environ.get("OLLAMA_URL", "http://localhost:11434"),
+        timeout_s=float(timeout_env) if timeout_env else None,
     )
 
 

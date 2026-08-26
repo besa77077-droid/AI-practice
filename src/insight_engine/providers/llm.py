@@ -74,7 +74,7 @@ class OllamaProvider(LLMProvider):
         self,
         model: str = "llama3.1",
         base_url: str = "http://localhost:11434",
-        timeout_s: float = 300.0,
+        timeout_s: float = 1200.0,
     ) -> None:
         self.model = model
         self.base_url = base_url.rstrip("/")
@@ -250,9 +250,18 @@ class MockLLMProvider(LLMProvider):
         )
 
 
-def build_llm_provider(name: str, *, model: str | None = None, base_url: str = "http://localhost:11434") -> LLMProvider:
+def build_llm_provider(
+    name: str,
+    *,
+    model: str | None = None,
+    base_url: str = "http://localhost:11434",
+    timeout_s: float | None = None,
+) -> LLMProvider:
     if name == "ollama":
-        return OllamaProvider(model=model or "llama3.1", base_url=base_url)
+        kwargs = {"model": model or "llama3.1", "base_url": base_url}
+        if timeout_s is not None:
+            kwargs["timeout_s"] = timeout_s
+        return OllamaProvider(**kwargs)
     if name == "mock":
         return MockLLMProvider()
     raise ValueError(f"Неизвестный LLM-провайдер: {name}")
