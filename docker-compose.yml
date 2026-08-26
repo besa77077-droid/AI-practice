@@ -28,6 +28,11 @@ services:
     environment:
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1}
+      # CPU inference of an 8B model can run at just ~2 tokens/sec — a real
+      # 20+ minute interview's transcript can take well over 5 minutes to
+      # extract insights from. Raise further (or lower for faster/smaller
+      # models) with OLLAMA_TIMEOUT_S=... before docker compose up.
+      OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-1200}
       INSIGHT_ENGINE_DB: /data/insights.db
       INSIGHT_ENGINE_LLM: ollama
       # Avoids a slow/unreliable accelerated-download path that made the
