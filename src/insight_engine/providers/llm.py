@@ -123,17 +123,48 @@ class OllamaProvider(LLMProvider):
         return _parse_hypothesis(raw, pain_title)
 
 
+_LIST_WRAPPER_KEYS = ("insights", "result", "results", "data", "items", "findings", "pains")
+
+
+def _coerce_insight_list(data: object, raw_payload: str) -> list:
+    """Ollama's JSON mode constrains output to valid JSON, but not to a bare
+    top-level array — smaller local models very often wrap it in an object
+    (`{"insights": [...]}`) or return `{}` when they find nothing, because
+    most of their JSON training data is object-shaped, not array-shaped.
+    Unwrap those common shapes instead of treating them as malformed."""
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        if not data:
+            return []  # model found nothing and said so as an empty object
+        for key in _LIST_WRAPPER_KEYS:
+            if isinstance(data.get(key), list):
+                return data[key]
+        if len(data) == 1:
+            (only_value,) = data.values()
+            if isinstance(only_value, list):
+                return only_value
+        if "quote" in data:
+            return [data]  # model returned a single insight, not a list of one
+
+    snippet = raw_payload.strip()[:300]
+    raise LLMError(
+        "LLM вернула неожиданный формат вместо списка инсайтов "
+        f"(ожидался JSON-массив или объект-обёртка). Начало ответа: {snippet!r}"
+    )
+
+
 def _parse_insights(raw: str) -> list[RawInsight]:
     payload = _extract_json_payload(raw)
     try:
         data = json.loads(payload)
     except json.JSONDecodeError as exc:
         raise LLMError(
-            f"LLM вернула не-JSON ответ, не удалось разобрать инсайты: {exc}"
+            f"LLM вернула не-JSON ответ, не удалось разобрать инсайты: {exc}. "
+            f"Начало ответа: {payload.strip()[:300]!r}"
         ) from exc
 
-    if not isinstance(data, list):
-        raise LLMError("LLM вернула не список инсайтов — ожидался JSON-массив.")
+    data = _coerce_insight_list(data, payload)
 
     insights = []
     for item in data:
@@ -162,7 +193,14 @@ def _parse_hypothesis(raw: str, pain_title: str) -> RawHypothesis:
             f"LLM вернула не-JSON ответ при формировании гипотезы: {exc}"
         ) from exc
     if not isinstance(data, dict):
-        raise LLMError("LLM вернула не объект гипотезы — ожидался JSON-объект.")
+        raise LLMError(
+            "LLM вернула не объект гипотезы — ожидался JSON-объект. "
+            f"Начало ответа: {payload.strip()[:300]!r}"
+        )
+    if "solution" not in data and len(data) == 1:
+        (only_value,) = data.values()  # e.g. {"hypothesis": {...}} wrapper
+        if isinstance(only_value, dict):
+            data = only_value
     return RawHypothesis(
         solution=str(data.get("solution", "")).strip() or "Уточнить решение",
         metric=str(data.get("metric", "")).strip() or "ключевая метрика",
