@@ -9,7 +9,9 @@ feedback until it either finished or the connection was reset.
 
 from __future__ import annotations
 
+import base64
 import os
+import secrets
 import tempfile
 from pathlib import Path
 
@@ -17,6 +19,8 @@ from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from insight_engine.jobs import STATUS_DONE, STATUS_ERROR, job_manager
 from insight_engine.pipeline import PipelineResult, ingest_audio, ingest_text, process_interview
@@ -26,7 +30,59 @@ from insight_engine.storage.sqlite_store import InsightStore
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+
+def _load_basic_auth_users() -> dict[str, str]:
+    """Parse INSIGHT_ENGINE_USERS="alice:pw1,bob:pw2" into a username->password map.
+
+    Empty/unset means auth is off — keeps local dev and existing tests working
+    without configuration. Set this env var to lock the app down once it's
+    reachable by more than one person (see README for deployment notes).
+    """
+    raw = os.environ.get("INSIGHT_ENGINE_USERS", "")
+    users: dict[str, str] = {}
+    for pair in raw.split(","):
+        pair = pair.strip()
+        if not pair:
+            continue
+        username, _, password = pair.partition(":")
+        if username and password:
+            users[username] = password
+    return users
+
+
+class BasicAuthMiddleware(BaseHTTPMiddleware):
+    """Gate every request behind HTTP Basic Auth when users are configured.
+
+    This is a stopgap for sharing the app with a handful of colleagues, not a
+    real identity system — no roles, no audit trail beyond what's logged.
+    Swap it for the company SSO/AD once this stops being a small-team tool.
+    """
+
+    async def dispatch(self, request, call_next):
+        users = _load_basic_auth_users()
+        if not users:
+            return await call_next(request)
+
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Basic "):
+            try:
+                decoded = base64.b64decode(auth_header[len("Basic "):]).decode("utf-8")
+                username, _, password = decoded.partition(":")
+            except Exception:
+                username, password = "", ""
+            expected = users.get(username)
+            if expected is not None and secrets.compare_digest(password, expected):
+                return await call_next(request)
+
+        return Response(
+            status_code=401,
+            content="Authentication required",
+            headers={"WWW-Authenticate": 'Basic realm="Insight Engine"'},
+        )
+
+
 app = FastAPI(title="Insight Engine")
+app.add_middleware(BasicAuthMiddleware)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 _store: InsightStore | None = None

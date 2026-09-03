@@ -35,6 +35,9 @@ services:
       OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-1200}
       INSIGHT_ENGINE_DB: /data/insights.db
       INSIGHT_ENGINE_LLM: ollama
+      # Locks the app behind HTTP Basic Auth once set, e.g. "alice:pw1,bob:pw2".
+      # Leave unset for local single-user use — see README for shared deployments.
+      INSIGHT_ENGINE_USERS: ${INSIGHT_ENGINE_USERS:-}
       # Avoids a slow/unreliable accelerated-download path that made the
       # first-run Whisper/HF model download hang in the previous prototype.
       HF_HUB_DISABLE_XET: "1"

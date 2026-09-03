@@ -22,6 +22,34 @@ def test_interviews_page_empty(client):
     assert "Загрузите запись" in resp.text
 
 
+def test_no_auth_required_when_users_not_configured(client):
+    resp = client.get("/interviews")
+    assert resp.status_code == 200
+
+
+def test_auth_required_once_users_are_configured(tmp_path, monkeypatch):
+    monkeypatch.setenv("INSIGHT_ENGINE_LLM", "mock")
+    monkeypatch.setenv("INSIGHT_ENGINE_DB", str(tmp_path / "insights.db"))
+    monkeypatch.setenv("INSIGHT_ENGINE_USERS", "alisher:s3cret,farida:hunter2")
+
+    import insight_engine.webapp as webapp
+
+    webapp._store = None
+    client = TestClient(webapp.app)
+
+    resp = client.get("/interviews")
+    assert resp.status_code == 401
+
+    resp = client.get("/interviews", auth=("alisher", "wrong-password"))
+    assert resp.status_code == 401
+
+    resp = client.get("/interviews", auth=("alisher", "s3cret"))
+    assert resp.status_code == 200
+
+    resp = client.get("/interviews", auth=("farida", "hunter2"))
+    assert resp.status_code == 200
+
+
 def test_upload_text_transcript_end_to_end(client):
     transcript = (
         "[00:05] Интервьюер: Расскажите про выписки.\n"
