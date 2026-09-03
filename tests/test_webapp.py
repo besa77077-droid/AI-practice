@@ -66,6 +66,53 @@ def test_upload_text_transcript_end_to_end(client):
     assert "Гипотезы" in hyps.text
 
 
+def test_upload_docx_transcript_end_to_end(client):
+    import io
+
+    from docx import Document
+
+    document = Document()
+    document.add_paragraph("[00:05] Интервьюер: Расскажите про выписки.")
+    document.add_paragraph(
+        "[00:12] Фарида Р.: Приложение отдаёт выписку только за месяц целиком, "
+        "а для отчётности мне нужен точный диапазон дат, это очень неудобно."
+    )
+    buffer = io.BytesIO()
+    document.save(buffer)
+    buffer.seek(0)
+
+    resp = client.post(
+        "/upload",
+        data={
+            "title": "Интервью docx",
+            "respondent": "Фарида Р.",
+            "segment_label": "Малый бизнес",
+            "source": "transcript_file",
+        },
+        files={
+            "transcript_file": (
+                "interview.docx",
+                buffer,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    job_id = resp.headers["location"].rsplit("/", 1)[-1]
+
+    for _ in range(50):
+        status_resp = client.get(f"/api/jobs/{job_id}")
+        payload = status_resp.json()
+        if payload["status"] in ("done", "error"):
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("job did not finish in time")
+
+    assert payload["status"] == "done", payload
+
+
 def test_upload_rejects_empty_text(client):
     resp = client.post(
         "/upload",

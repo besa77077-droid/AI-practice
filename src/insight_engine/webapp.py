@@ -56,6 +56,24 @@ def _save_upload_to_temp(upload: UploadFile) -> str:
         return tmp.name
 
 
+def _read_transcript_upload(upload: UploadFile) -> str:
+    suffix = Path(upload.filename or "").suffix.lower()
+    raw = upload.file.read()
+    if suffix == ".docx":
+        import io
+
+        from docx import Document
+
+        try:
+            document = Document(io.BytesIO(raw))
+        except Exception as exc:
+            raise ValueError(
+                "Не удалось прочитать .docx — файл повреждён или это не Word-документ"
+            ) from exc
+        return "\n".join(p.text for p in document.paragraphs)
+    return raw.decode("utf-8")
+
+
 @app.get("/", response_class=HTMLResponse)
 def root():
     return RedirectResponse(url="/interviews")
@@ -138,7 +156,7 @@ def upload(
         elif source == "transcript_file":
             if transcript_file is None or not transcript_file.filename:
                 raise ValueError("Выберите файл транскрипта")
-            text_value = transcript_file.file.read().decode("utf-8")
+            text_value = _read_transcript_upload(transcript_file)
         else:
             if not transcript_text.strip():
                 raise ValueError("Введите текст транскрипта")
